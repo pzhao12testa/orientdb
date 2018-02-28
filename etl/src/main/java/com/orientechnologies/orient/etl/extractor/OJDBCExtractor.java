@@ -109,7 +109,6 @@ public class OJDBCExtractor extends OAbstractExtractor {
         OType type = OType.ANY;
         final int sqlType = rs.getMetaData().getColumnType(i);
         switch (sqlType) {
-        case Types.BIT:
         case Types.BOOLEAN:
           type = OType.BOOLEAN;
           break;

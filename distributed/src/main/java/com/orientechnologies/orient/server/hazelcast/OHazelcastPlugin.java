@@ -26,7 +26,6 @@ import com.orientechnologies.common.console.DefaultConsoleReader;
 import com.orientechnologies.common.console.OConsoleReader;
 import com.orientechnologies.common.exception.OException;
 import com.orientechnologies.common.io.OFileUtils;
-import com.orientechnologies.common.io.OIOUtils;
 import com.orientechnologies.common.log.OLogManager;
 import com.orientechnologies.common.parser.OSystemVariableResolver;
 import com.orientechnologies.common.util.OArrays;
@@ -81,8 +80,9 @@ import java.util.concurrent.locks.Lock;
 
 /**
  * Hazelcast implementation for clustering.
- *
+ * 
  * @author Luca Garulli (l.garulli--at--orientechnologies.com)
+ * 
  */
 public class OHazelcastPlugin extends ODistributedAbstractPlugin
     implements MembershipListener, EntryListener<String, Object>, OCommandOutputListener {
@@ -193,13 +193,6 @@ public class OHazelcastPlugin extends ODistributedAbstractPlugin
       ODistributedServerLog.error(this, localNodeName, null, DIRECTION.NONE, "Error on starting distributed plugin", e);
       System.exit(1);
     }
-  }
-
-  @Override
-  public Throwable convertException(final Throwable original) {
-    if (original instanceof HazelcastException || original instanceof HazelcastInstanceNotActiveException)
-      return new IOException("Hazelcast wrapped exception: " + original.getMessage(), original.getCause());
-    return original;
   }
 
   @Override
@@ -324,6 +317,9 @@ public class OHazelcastPlugin extends ODistributedAbstractPlugin
 
   @Override
   public DB_STATUS getDatabaseStatus(final String iNode, final String iDatabaseName) {
+    // if (!activeNodes.containsKey(iNode))
+    // return DB_STATUS.OFFLINE;
+    //
     final DB_STATUS status = (DB_STATUS) getConfigurationMap()
         .get(OHazelcastPlugin.CONFIG_DBSTATUS_PREFIX + iNode + "." + iDatabaseName);
     return status != null ? status : DB_STATUS.OFFLINE;
@@ -459,7 +455,7 @@ public class OHazelcastPlugin extends ODistributedAbstractPlugin
 
   @Override
   public void onCreateClass(final ODatabaseInternal iDatabase, final OClass iClass) {
-    if (OScenarioThreadLocal.INSTANCE.getRunMode() == OScenarioThreadLocal.RUN_MODE.RUNNING_DISTRIBUTED)
+    if (OScenarioThreadLocal.INSTANCE.get() == OScenarioThreadLocal.RUN_MODE.RUNNING_DISTRIBUTED)
       return;
 
     // RUN ONLY IN NON-DISTRIBUTED MODE
@@ -484,15 +480,6 @@ public class OHazelcastPlugin extends ODistributedAbstractPlugin
   @Override
   public void onDrop(final ODatabaseInternal iDatabase) {
     super.onDrop(iDatabase);
-
-    final String dbName = iDatabase.getName();
-
-    getConfigurationMap().remove(OHazelcastPlugin.CONFIG_DBSTATUS_PREFIX + getLocalNodeName() + "." + dbName);
-
-    final int availableNodes = getAvailableNodes(dbName);
-    if (availableNodes == 0)
-      // LAST NODE HOLDING THE DATABASE, DELETE DISTRIBUTED CFG TOO
-      getConfigurationMap().remove(OHazelcastPlugin.CONFIG_DATABASE_PREFIX + dbName);
   }
 
   @SuppressWarnings("unchecked")
@@ -521,7 +508,7 @@ public class OHazelcastPlugin extends ODistributedAbstractPlugin
       if (!queueName.startsWith(OHazelcastDistributedMessageService.NODE_QUEUE_PREFIX))
         continue;
 
-      final IQueue queue = hazelcastInstance.getQueue(queueName);
+      final IQueue<Object> queue = hazelcastInstance.getQueue(queueName);
 
       final String[] names = queueName.split("\\.");
 
@@ -595,19 +582,20 @@ public class OHazelcastPlugin extends ODistributedAbstractPlugin
 
       // UNLOCK ANY PENDING LOCKS
       if (messageService != null)
-        for (String dbName : messageService.getDatabases()) {
+        for (String dbName : messageService.getDatabases())
           messageService.getDatabase(dbName).unlockRecords(nodeName);
 
-          // UNREGISTER DB STATUSES. INSIDE TRY/CATCH TO AVOID HZ EXCEPTIONS
-          try {
-            if (getConfigurationMap().remove(CONFIG_DBSTATUS_PREFIX + nodeName + "." + dbName) != null) {
-              ODistributedServerLog.debug(this, getLocalNodeName(), null, DIRECTION.NONE,
-                  "removed dbstatus for '%s.%s' that just left: %s", nodeName, dbName);
-            }
-          } catch (Exception e) {
-            OLogManager.instance().debug(this, "error on removing dbstatus for '%s.%s'", nodeName, dbName);
+      // UNREGISTER DB STATUSES
+      for (Iterator<String> it = getConfigurationMap().keySet().iterator(); it.hasNext();) {
+        final String n = it.next();
+
+        if (n.startsWith(CONFIG_DBSTATUS_PREFIX))
+          if (n.substring(CONFIG_DBSTATUS_PREFIX.length()).equals(nodeName)) {
+            ODistributedServerLog.debug(this, getLocalNodeName(), null, DIRECTION.NONE,
+                "removing dbstatus for the node %s that just left: %s", nodeName, n);
+            it.remove();
           }
-        }
+      }
 
       activeNodes.remove(nodeName);
 
@@ -753,20 +741,17 @@ public class OHazelcastPlugin extends ODistributedAbstractPlugin
 
   @Override
   public void mapEvicted(MapEvent event) {
+
   }
 
   @Override
   public void mapCleared(MapEvent event) {
+
   }
 
   @Override
   public boolean isNodeAvailable(final String iNodeName, final String iDatabaseName) {
     return getDatabaseStatus(iNodeName, iDatabaseName) != DB_STATUS.OFFLINE;
-  }
-
-  @Override
-  public boolean isNodeOnline(final String iNodeName, final String iDatabaseName) {
-    return getDatabaseStatus(iNodeName, iDatabaseName) == DB_STATUS.ONLINE;
   }
 
   public boolean isOffline() {
@@ -990,7 +975,7 @@ public class OHazelcastPlugin extends ODistributedAbstractPlugin
     Orient.instance().unregisterStorageByName(iDatabaseName);
 
     final String backupDirectory = OGlobalConfiguration.DISTRIBUTED_BACKUP_DIRECTORY.getValueAsString();
-    if (backupDirectory == null || OIOUtils.getStringContent(backupDirectory).trim().isEmpty())
+    if (backupDirectory == null)
       // SKIP BACKUP
       return;
 
@@ -1016,13 +1001,11 @@ public class OHazelcastPlugin extends ODistributedAbstractPlugin
     final File oldDirectory = new File(dbPath);
     if (!oldDirectory.renameTo(backupFullPath)) {
       ODistributedServerLog.error(this, getLocalNodeName(), null, DIRECTION.NONE,
-          "error on moving existent database '%s' located in '%s' to '%s'. Deleting old database...", iDatabaseName, dbPath,
-          backupFullPath);
+          "error on moving existent database '%s' located in '%s' to '%s'. Try to move the database directory manually and retry",
+          iDatabaseName, dbPath, backupFullPath);
 
-      // throw new ODistributedException("Error on moving existent database '" + iDatabaseName + "' located in '" + dbPath + "' to
-      // '"
-      // + backupFullPath + "'. Try to move the database directory manually and retry");
-      OFileUtils.deleteRecursively(oldDirectory);
+      throw new ODistributedException("Error on moving existent database '" + iDatabaseName + "' located in '" + dbPath + "' to '"
+          + backupFullPath + "'. Try to move the database directory manually and retry");
     }
   }
 
@@ -1232,9 +1215,9 @@ public class OHazelcastPlugin extends ODistributedAbstractPlugin
             ODistributedServerLog.info(this, nodeName, null, DIRECTION.NONE, "class %s, creation of new cluster '%s' (id=%d)",
                 iClass, newClusterName, iDatabase.getClusterIdByName(newClusterName));
 
-            final OScenarioThreadLocal.RUN_MODE currentDistributedMode = OScenarioThreadLocal.INSTANCE.getRunMode();
+            final OScenarioThreadLocal.RUN_MODE currentDistributedMode = OScenarioThreadLocal.INSTANCE.get();
             if (currentDistributedMode != OScenarioThreadLocal.RUN_MODE.DEFAULT)
-              OScenarioThreadLocal.INSTANCE.setRunMode(OScenarioThreadLocal.RUN_MODE.DEFAULT);
+              OScenarioThreadLocal.INSTANCE.set(OScenarioThreadLocal.RUN_MODE.DEFAULT);
 
             try {
               iClass.addCluster(newClusterName);
@@ -1249,7 +1232,7 @@ public class OHazelcastPlugin extends ODistributedAbstractPlugin
 
               if (currentDistributedMode != OScenarioThreadLocal.RUN_MODE.DEFAULT)
                 // RESTORE PREVIOUS MODE
-                OScenarioThreadLocal.INSTANCE.setRunMode(OScenarioThreadLocal.RUN_MODE.RUNNING_DISTRIBUTED);
+                OScenarioThreadLocal.INSTANCE.set(OScenarioThreadLocal.RUN_MODE.RUNNING_DISTRIBUTED);
             }
 
             ODistributedServerLog.info(this, nodeName, null, DIRECTION.NONE,
@@ -1261,11 +1244,8 @@ public class OHazelcastPlugin extends ODistributedAbstractPlugin
         }
       }
 
-      if (distributedCfgDirty) {
-        final boolean deployToCluster = isNodeOnline(getLocalNodeName(), databaseName);
-
-        updateCachedDatabaseConfiguration(databaseName, cfg.serialize(), true, deployToCluster);
-      }
+      if (distributedCfgDirty)
+        updateCachedDatabaseConfiguration(databaseName, cfg.serialize(), true, true);
 
     } finally {
       lock.unlock();
@@ -1616,9 +1596,9 @@ public class OHazelcastPlugin extends ODistributedAbstractPlugin
         ODistributedServerLog.info(this, nodeName, null, DIRECTION.NONE, "class '%s', creation of new local cluster '%s' (id=%d)",
             iClass, newClusterName, iDatabase.getClusterIdByName(newClusterName));
 
-        final OScenarioThreadLocal.RUN_MODE currentDistributedMode = OScenarioThreadLocal.INSTANCE.getRunMode();
+        final OScenarioThreadLocal.RUN_MODE currentDistributedMode = OScenarioThreadLocal.INSTANCE.get();
         if (currentDistributedMode != OScenarioThreadLocal.RUN_MODE.DEFAULT)
-          OScenarioThreadLocal.INSTANCE.setRunMode(OScenarioThreadLocal.RUN_MODE.DEFAULT);
+          OScenarioThreadLocal.INSTANCE.set(OScenarioThreadLocal.RUN_MODE.DEFAULT);
 
         try {
           iClass.addCluster(newClusterName);
@@ -1633,7 +1613,7 @@ public class OHazelcastPlugin extends ODistributedAbstractPlugin
 
           if (currentDistributedMode != OScenarioThreadLocal.RUN_MODE.DEFAULT)
             // RESTORE PREVIOUS MODE
-            OScenarioThreadLocal.INSTANCE.setRunMode(OScenarioThreadLocal.RUN_MODE.RUNNING_DISTRIBUTED);
+            OScenarioThreadLocal.INSTANCE.set(OScenarioThreadLocal.RUN_MODE.RUNNING_DISTRIBUTED);
         }
 
         ODistributedServerLog.info(this, nodeName, null, DIRECTION.NONE,
@@ -1660,7 +1640,7 @@ public class OHazelcastPlugin extends ODistributedAbstractPlugin
     return this;
   }
 
-  public void disconnectNode(final String iNode) {
+  public void unjoinNode(final String iNode) {
     final Set<String> databases = new HashSet<String>();
 
     for (Map.Entry<String, Object> entry : getConfigurationMap().entrySet()) {
@@ -1678,9 +1658,8 @@ public class OHazelcastPlugin extends ODistributedAbstractPlugin
       getConfigurationMap().put(k, DB_STATUS.OFFLINE);
 
     // GET THE SENDER'S RESPONSE QUEUE
-    final IQueue queue = messageService.getQueue(OHazelcastDistributedMessageService.getResponseQueueName(iNode));
-
-    ODistributedServerLog.warn(this, nodeName, null, DIRECTION.NONE, "sending request of restarting node '%s'...", iNode);
+    final IQueue<ODistributedResponse> queue = messageService
+        .getQueue(OHazelcastDistributedMessageService.getResponseQueueName(iNode));
 
     final OHazelcastDistributedResponse response = new OHazelcastDistributedResponse(-1, nodeName, iNode, new ORestartNodeTask());
 

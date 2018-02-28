@@ -20,6 +20,28 @@
 
 package com.orientechnologies.orient.core.storage.impl.local;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
+
 import com.orientechnologies.common.concur.lock.OLockManager;
 import com.orientechnologies.common.concur.lock.OModificationLock;
 import com.orientechnologies.common.exception.OException;
@@ -90,28 +112,6 @@ import com.orientechnologies.orient.core.version.ORecordVersion;
 import com.orientechnologies.orient.core.version.OSimpleVersion;
 import com.orientechnologies.orient.core.version.OVersionFactory;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.Callable;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipOutputStream;
-
 /**
  * @author Andrey Lomakin
  * @since 28.03.13
@@ -130,7 +130,6 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract impleme
   private final OModificationLock                   modificationLock     = new OModificationLock();
   private final AtomicBoolean                       checkpointInProgress = new AtomicBoolean();
   protected volatile OWriteAheadLog                 writeAheadLog;
-  private OStorageRecoverListener                   recoverListener;
 
   protected volatile OReadCache  readCache;
   protected volatile OWriteCache writeCache;
@@ -140,7 +139,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract impleme
   private List<OCluster>                    clusters                                   = new ArrayList<OCluster>();
   private volatile int                      defaultClusterId                           = -1;
   private volatile OAtomicOperationsManager atomicOperationsManager;
-  private volatile boolean                  wereDataRecoverAfterOpen                   = false;
+  private volatile boolean                  wereDataRestoredAfterOpen                  = false;
   private volatile boolean                  wereNonTxOperationsPerformedInPreviousOpen = false;
   private boolean                           makeFullCheckPointAfterClusterCreate       = OGlobalConfiguration.STORAGE_MAKE_FULL_CHECKPOINT_AFTER_CLUSTER_CREATE
       .getValueAsBoolean();
@@ -202,7 +201,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract impleme
         OLogManager.instance().error(this, "MBean for atomic operations manager cannot be registered.", e);
       }
 
-      recoverIfNeeded();
+      restoreIfNeeded();
 
       // OPEN BASIC SEGMENTS
       int pos;
@@ -840,15 +839,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract impleme
   public OStorageOperationResult<ORawBuffer> readRecord(final ORecordId iRid, final String iFetchPlan, boolean iIgnoreCache,
       ORecordCallback<ORawBuffer> iCallback) {
     checkOpeness();
-
-    final OCluster cluster;
-    try {
-      cluster = getClusterById(iRid.clusterId);
-    } catch (IllegalArgumentException e) {
-      throw new ORecordNotFoundException("The record with id '" + iRid + "' was not found", e);
-    }
-
-    return new OStorageOperationResult<ORawBuffer>(readRecord(cluster, iRid));
+    return new OStorageOperationResult<ORawBuffer>(readRecord(getClusterById(iRid.clusterId), iRid));
   }
 
   /**
@@ -1489,7 +1480,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract impleme
   }
 
   public boolean wereDataRestoredAfterOpen() {
-    return wereDataRecoverAfterOpen;
+    return wereDataRestoredAfterOpen;
   }
 
   public boolean wereNonTxOperationsPerformedInPreviousOpen() {
@@ -1674,19 +1665,6 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract impleme
     } finally {
       stateLock.releaseReadLock();
     }
-  }
-
-  public OStorageRecoverListener getRecoverListener() {
-    return recoverListener;
-  }
-
-  public void registerRecoverListener(final OStorageRecoverListener recoverListener) {
-    this.recoverListener = recoverListener;
-  }
-
-  public void unregisterRecoverListener(final OStorageRecoverListener recoverListener) {
-    if (this.recoverListener == recoverListener)
-      this.recoverListener = null;
   }
 
   public void acquireWriteLock(final ORID rid) {
@@ -1928,21 +1906,17 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract impleme
     assert atomicOperationsManager.getCurrentOperation() == null;
   }
 
-  private void recoverIfNeeded() throws Exception {
+  private void restoreIfNeeded() throws Exception {
     if (isDirty()) {
-      OLogManager.instance().warn(this, "Storage '" + name + "' was not closed properly. Will try to recover from write ahead log");
+      OLogManager.instance().warn(this, "Storage " + name + " was not closed properly. Will try to restore from write ahead log.");
       try {
-        wereDataRecoverAfterOpen = recoverFromWAL();
-
-        if (recoverListener != null)
-          recoverListener.onStorageRecover();
-
+        wereDataRestoredAfterOpen = restoreFromWAL();
       } catch (Exception e) {
-        OLogManager.instance().error(this, "Exception during storage data recover", e);
+        OLogManager.instance().error(this, "Exception during storage data restore.", e);
         throw e;
       }
 
-      OLogManager.instance().info(this, "Storage data recover was completed");
+      OLogManager.instance().info(this, "Storage data restore was completed");
     }
   }
 
@@ -2505,7 +2479,7 @@ public abstract class OAbstractPaginatedStorage extends OStorageAbstract impleme
       throw new IllegalArgumentException("Cluster segment #" + iClusterId + " does not exist in database '" + name + "'");
   }
 
-  private boolean recoverFromWAL() throws IOException {
+  private boolean restoreFromWAL() throws IOException {
     if (writeAheadLog == null) {
       OLogManager.instance().error(this, "Restore is not possible because write ahead logging is switched off.");
       return true;

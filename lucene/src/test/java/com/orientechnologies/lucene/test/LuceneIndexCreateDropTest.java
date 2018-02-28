@@ -37,7 +37,7 @@ public class LuceneIndexCreateDropTest extends BaseLuceneTest {
   }
 
   public LuceneIndexCreateDropTest(boolean remote) {
-    super();
+    super(remote);
   }
 
   @Override

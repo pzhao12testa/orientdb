@@ -91,7 +91,6 @@ import com.orientechnologies.orient.server.OServer;
 import com.orientechnologies.orient.server.ShutdownHelper;
 import com.orientechnologies.orient.server.distributed.ODistributedServerManager;
 import com.orientechnologies.orient.server.network.OServerNetworkListener;
-import com.orientechnologies.orient.server.network.protocol.ONetworkProtocolData;
 import com.orientechnologies.orient.server.plugin.OServerPlugin;
 import com.orientechnologies.orient.server.plugin.OServerPluginHelper;
 import com.orientechnologies.orient.server.security.OSecurityServerUser;
@@ -193,11 +192,8 @@ public class ONetworkProtocolBinary extends OBinaryNetworkProtocolAbstract {
             throw new OSecurityException("The token provided is expired");
           }
           connection = new OClientConnection(clientTxId, this);
-          if (tokenHandler != null) {
-            final ONetworkProtocolData data = tokenHandler.getProtocolDataFromToken(token);
-            if (data != null)
-              connection.data = data;
-          }
+          if (tokenHandler != null)
+            connection.data = tokenHandler.getProtocolDataFromToken(token);
           String db = token.getDatabase();
           String type = token.getDatabaseType();
           if (db != null && type != null) {
@@ -645,8 +641,8 @@ public class ONetworkProtocolBinary extends OBinaryNetworkProtocolAbstract {
 
     final String clusterName = connection.database.getClusterNameById(id);
     if (clusterName == null)
-      throw new IllegalArgumentException(
-          "Cluster " + id + " doesn't exist anymore. Refresh the db structure or just reconnect to the database");
+      throw new IllegalArgumentException("Cluster " + id
+          + " doesn't exist anymore. Refresh the db structure or just reconnect to the database");
 
     boolean result = connection.database.dropCluster(clusterName, true);
 
@@ -962,8 +958,8 @@ public class ONetworkProtocolBinary extends OBinaryNetworkProtocolAbstract {
     } else if (operation.equals("config")) {
       checkServerAccess("server.replication.config");
 
-      response = new ODocument()
-          .fromJSON(dManager.getDatabaseConfiguration((String) request.field("db")).serialize().toJSON("prettyPrint"));
+      response = new ODocument().fromJSON(dManager.getDatabaseConfiguration((String) request.field("db")).serialize()
+          .toJSON("prettyPrint"));
 
     }
 
@@ -1286,8 +1282,8 @@ public class ONetworkProtocolBinary extends OBinaryNetworkProtocolAbstract {
       ORecordSerializer ser = ORecordSerializerFactory.instance().getFormat(name);
       ONetworkThreadLocalSerializer.setNetworkSerializer(ser);
     }
-    final OCommandRequestText command = (OCommandRequestText) OStreamSerializerAnyStreamable.INSTANCE
-        .fromStream(channel.readBytes());
+    final OCommandRequestText command = (OCommandRequestText) OStreamSerializerAnyStreamable.INSTANCE.fromStream(channel
+        .readBytes());
     ONetworkThreadLocalSerializer.setNetworkSerializer(null);
 
     connection.data.commandDetail = command.getText();
@@ -1799,8 +1795,7 @@ public class ONetworkProtocolBinary extends OBinaryNetworkProtocolAbstract {
   protected void endResponse() throws IOException {
     // resetting transaction state. Commands are stateless and connection should be cleared
     // otherwise reused connection (connections pool) may lead to unpredicted errors
-    if (connection != null && connection.database != null
-        && connection.database.activateOnCurrentThread().getTransaction() != null) {
+    if (connection != null && connection.database != null && connection.database.activateOnCurrentThread().getTransaction() != null) {
       connection.database.activateOnCurrentThread();
       connection.database.getTransaction().rollback();
     }
@@ -2025,10 +2020,6 @@ public class ONetworkProtocolBinary extends OBinaryNetworkProtocolAbstract {
 
   private void serializeExceptionObject(Throwable original) throws IOException {
     try {
-      final ODistributedServerManager srvMgr = server.getDistributedManager();
-      if (srvMgr != null)
-        original = srvMgr.convertException(original);
-
       final OMemoryStream memoryStream = new OMemoryStream();
       final ObjectOutputStream objectOutputStream = new ObjectOutputStream(memoryStream);
 
@@ -2076,8 +2067,8 @@ public class ONetworkProtocolBinary extends OBinaryNetworkProtocolAbstract {
     final OSBTreeCollectionManager sbTreeCollectionManager = connection.database.getSbTreeCollectionManager();
     final OSBTreeBonsai<OIdentifiable, Integer> tree = sbTreeCollectionManager.loadSBTree(collectionPointer);
     try {
-      final Map<OIdentifiable, OSBTreeRidBag.Change> changes = OSBTreeRidBag.ChangeSerializationHelper.INSTANCE
-          .deserializeChanges(changeStream, 0);
+      final Map<OIdentifiable, OSBTreeRidBag.Change> changes = OSBTreeRidBag.ChangeSerializationHelper.INSTANCE.deserializeChanges(
+          changeStream, 0);
 
       int realSize = tree.getRealBagSize(changes);
 
@@ -2132,8 +2123,8 @@ public class ONetworkProtocolBinary extends OBinaryNetworkProtocolAbstract {
 
   private byte[] serializeSBTreeEntryCollection(List<Entry<OIdentifiable, Integer>> collection,
       OBinarySerializer<OIdentifiable> keySerializer, OBinarySerializer<Integer> valueSerializer) {
-    byte[] stream = new byte[OIntegerSerializer.INT_SIZE
-        + collection.size() * (keySerializer.getFixedLength() + valueSerializer.getFixedLength())];
+    byte[] stream = new byte[OIntegerSerializer.INT_SIZE + collection.size()
+        * (keySerializer.getFixedLength() + valueSerializer.getFixedLength())];
     int offset = 0;
 
     OIntegerSerializer.INSTANCE.serializeLiteral(collection.size(), stream, offset);

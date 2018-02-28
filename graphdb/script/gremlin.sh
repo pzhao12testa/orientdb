@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 #set current working directory
 cd `dirname $0`
@@ -28,12 +28,10 @@ fi
 if [ "$1" = "-e" ]; then
   k=$2
   if [ $# -gt 2 ]; then
-    i=0 ;
-    while [ "$i" -lt $# +1 ]
+    for (( i=3 ; i -lt $# + 1 ; i++ ))
     do
       eval a=\$$i
       k="$k \"$a\""
-        i=$(($i+1))
     done
   fi
   eval "$JAVA" $JAVA_OPTIONS -cp $CP:../plugins/*.jar com.tinkerpop.gremlin.groovy.jsr223.ScriptExecutor $k

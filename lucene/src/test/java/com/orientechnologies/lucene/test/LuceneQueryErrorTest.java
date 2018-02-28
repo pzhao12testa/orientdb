@@ -41,7 +41,7 @@ public class LuceneQueryErrorTest extends BaseLuceneTest {
   }
 
   public LuceneQueryErrorTest(boolean remote) {
-    super();
+    super(remote);
   }
 
   @Override

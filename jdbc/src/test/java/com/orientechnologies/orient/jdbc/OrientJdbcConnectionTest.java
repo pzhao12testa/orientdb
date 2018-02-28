@@ -53,7 +53,7 @@ public class OrientJdbcConnectionTest extends OrientJdbcBaseTest {
 
   @Test
   public void shouldConnectUsingPool() throws Exception {
-    String dbUrl = "jdbc:orient:memory:test";
+    String dbUrl = "memory:test";
     Properties p = new Properties();
     p.setProperty("db.usePool", "TRUE");
 

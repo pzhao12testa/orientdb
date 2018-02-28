@@ -22,11 +22,11 @@ package com.orientechnologies.orient.enterprise.channel.binary;
 import com.orientechnologies.common.concur.OTimeoutException;
 import com.orientechnologies.common.concur.lock.OLockException;
 import com.orientechnologies.common.exception.OException;
-import com.orientechnologies.common.io.OIOException;
 import com.orientechnologies.common.log.OLogManager;
 import com.orientechnologies.common.util.OPair;
 import com.orientechnologies.orient.core.config.OContextConfiguration;
 import com.orientechnologies.orient.core.config.OGlobalConfiguration;
+import com.orientechnologies.orient.core.exception.OStorageException;
 import com.orientechnologies.orient.core.serialization.OMemoryInputStream;
 import com.orientechnologies.orient.enterprise.channel.OSocketFactory;
 
@@ -64,7 +64,7 @@ public class OChannelBinaryAsynchClient extends OChannelBinary {
 
   public OChannelBinaryAsynchClient(final String remoteHost, final int remotePort, final String iDatabaseName,
       final OContextConfiguration iConfig, final int protocolVersion, final ORemoteServerEventListener asynchEventListener)
-          throws IOException {
+      throws IOException {
     super(OSocketFactory.instance(iConfig).createSocket(), iConfig);
     try {
 
@@ -95,12 +95,13 @@ public class OChannelBinaryAsynchClient extends OChannelBinary {
 
         srvProtocolVersion = readShort();
       } catch (IOException e) {
-        throw new ONetworkProtocolException(
-            "Cannot read protocol version from remote server " + socket.getRemoteSocketAddress() + ": " + e);
+        throw new ONetworkProtocolException("Cannot read protocol version from remote server " + socket.getRemoteSocketAddress()
+            + ": " + e);
       }
 
       if (srvProtocolVersion != protocolVersion) {
-        OLogManager.instance().warn(this,
+        OLogManager.instance().warn(
+            this,
             "The Client driver version is different than Server version: client=" + protocolVersion + ", server="
                 + srvProtocolVersion
                 + ". You could not use the full features of the newer version. Assure to have the same versions on both");
@@ -134,7 +135,7 @@ public class OChannelBinaryAsynchClient extends OChannelBinary {
 
     } catch (Exception e) {
       // UNABLE TO REPRODUCE THE SAME SERVER-SIZE EXCEPTION: THROW A STORAGE EXCEPTION
-      rootException = new OIOException(iMessage, iPrevious);
+      rootException = new OStorageException(iMessage, iPrevious);
     }
 
     if (c != null)
@@ -413,15 +414,13 @@ public class OChannelBinaryAsynchClient extends OChannelBinary {
   }
 
   private void setReadResponseTimeout() throws SocketException {
-    final Socket s = socket;
-    if (s != null && s.isConnected() && !s.isClosed())
-      s.setSoTimeout(socketTimeout);
+    if (socket != null && socket.isConnected() && !socket.isClosed())
+      socket.setSoTimeout(socketTimeout);
   }
 
   private void setWaitResponseTimeout() throws SocketException {
-    final Socket s = socket;
-    if (s != null)
-      s.setSoTimeout(OGlobalConfiguration.NETWORK_REQUEST_TIMEOUT.getValueAsInteger());
+    if (socket != null)
+      socket.setSoTimeout(OGlobalConfiguration.NETWORK_REQUEST_TIMEOUT.getValueAsInteger());
   }
 
   private void throwSerializedException(final byte[] serializedException) throws IOException {
@@ -443,7 +442,8 @@ public class OChannelBinaryAsynchClient extends OChannelBinary {
       // WRAP IT
       throw new OResponseProcessingException("Exception during response processing.", (Throwable) throwable);
     else
-      OLogManager.instance().error(this,
+      OLogManager.instance().error(
+          this,
           "Error during exception serialization, serialized exception is not Throwable, exception type is "
               + (throwable != null ? throwable.getClass().getName() : "null"));
   }

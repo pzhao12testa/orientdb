@@ -52,7 +52,7 @@ public class LuceneInsertReadMultithreadTest extends BaseLuceneTest {
   }
 
   public LuceneInsertReadMultithreadTest(boolean remote) {
-    super();
+    super(remote);
   }
 
   @Test(enabled = false)

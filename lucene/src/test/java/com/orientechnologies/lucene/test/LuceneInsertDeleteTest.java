@@ -44,7 +44,7 @@ public class LuceneInsertDeleteTest extends BaseLuceneTest {
   }
 
   public LuceneInsertDeleteTest(boolean remote) {
-    super();
+    super(remote);
   }
 
   @Override

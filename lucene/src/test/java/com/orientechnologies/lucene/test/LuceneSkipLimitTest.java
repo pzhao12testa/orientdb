@@ -45,7 +45,7 @@ public class LuceneSkipLimitTest extends BaseLuceneTest {
     }
 
     public LuceneSkipLimitTest(boolean remote) {
-        super();
+        super(remote);
     }
 
     @Override
