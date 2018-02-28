@@ -32,8 +32,6 @@ import com.orientechnologies.orient.core.db.record.OIdentifiable;
 import com.orientechnologies.orient.core.db.record.ORecordLazyMultiValue;
 import com.orientechnologies.orient.core.db.record.ridbag.ORidBag;
 import com.orientechnologies.orient.core.exception.OConfigurationException;
-import com.orientechnologies.orient.core.exception.OSchemaException;
-import com.orientechnologies.orient.core.exception.OSerializationException;
 import com.orientechnologies.orient.core.id.ORID;
 import com.orientechnologies.orient.core.id.ORecordId;
 import com.orientechnologies.orient.core.index.OIndex;
@@ -52,7 +50,6 @@ import com.orientechnologies.orient.core.metadata.schema.OClassImpl;
 import com.orientechnologies.orient.core.metadata.schema.OPropertyImpl;
 import com.orientechnologies.orient.core.metadata.schema.OSchema;
 import com.orientechnologies.orient.core.metadata.schema.OType;
-import com.orientechnologies.orient.core.metadata.security.OIdentity;
 import com.orientechnologies.orient.core.metadata.security.ORole;
 import com.orientechnologies.orient.core.metadata.security.OSecurityShared;
 import com.orientechnologies.orient.core.metadata.security.OUser;
@@ -121,7 +118,6 @@ public class ODatabaseImport extends ODatabaseImpExpAbstract {
   private boolean                    rebuildIndexes                  = true;
 
   private Set<String>                indexesToRebuild                = new HashSet<String>();
-  private Map<String, String>        convertedClassNames             = new HashMap<String, String>();
 
   private interface ValuesConverter<T> {
     T convert(T value);
@@ -606,7 +602,7 @@ public class ODatabaseImport extends ODatabaseImpExpAbstract {
     for (OClass dbClass : classes) {
       String className = dbClass.getName();
       if (!className.equalsIgnoreCase(ORole.CLASS_NAME) && !className.equalsIgnoreCase(OUser.CLASS_NAME)
-          && !className.equalsIgnoreCase(OIdentity.CLASS_NAME)) {
+          && !className.equalsIgnoreCase(OSecurityShared.IDENTITY_CLASSNAME)) {
         classesToDrop.put(className, dbClass);
       }
     }
@@ -778,7 +774,7 @@ public class ODatabaseImport extends ODatabaseImpExpAbstract {
       do {
         jsonReader.readNext(OJSONReader.BEGIN_OBJECT);
 
-        String className = jsonReader.readNext(OJSONReader.FIELD_ASSIGNMENT).checkContent("\"name\"")
+        final String className = jsonReader.readNext(OJSONReader.FIELD_ASSIGNMENT).checkContent("\"name\"")
             .readString(OJSONReader.COMMA_SEPARATOR);
 
         String next = jsonReader.readNext(OJSONReader.FIELD_ASSIGNMENT).getValue();
@@ -800,16 +796,6 @@ public class ODatabaseImport extends ODatabaseImpExpAbstract {
             .readString(OJSONReader.END_COLLECTION, true).trim();
 
         jsonReader.readNext(OJSONReader.NEXT_IN_OBJECT);
-
-        if (className.contains(".")) {
-          // MIGRATE OLD NAME WITH . TO _
-          final String newClassName = className.replace('.', '_');
-          convertedClassNames.put(className, newClassName);
-
-          listener.onMessage("\nWARNING: class '" + className + "' has been renamed in '" + newClassName + "'\n");
-
-          className = newClassName;
-        }
 
         OClassImpl cls = (OClassImpl) database.getMetadata().getSchema().getClass(className);
 
@@ -847,8 +833,7 @@ public class ODatabaseImport extends ODatabaseImpExpAbstract {
             cls.setStrictMode(Boolean.parseBoolean(strictMode));
           } else if (value.equals("\"short-name\"")) {
             final String shortName = jsonReader.readString(OJSONReader.NEXT_IN_OBJECT);
-            if( !cls.getName().equalsIgnoreCase( shortName ))
-              cls.setShortName(shortName);
+            cls.setShortName(shortName);
           } else if (value.equals("\"super-class\"")) {
             // @compatibility <2.1 SINGLE CLASS ONLY
             final String classSuper = jsonReader.readString(OJSONReader.NEXT_IN_OBJECT);
@@ -1235,7 +1220,7 @@ public class ODatabaseImport extends ODatabaseImpExpAbstract {
         ++lastLapRecords;
         ++totalRecords;
 
-        if (rid.getClusterId() != lastRid.getClusterId() || involvedClusters.isEmpty())
+        if (rid.getClusterId() != lastRid.getClusterId())
           involvedClusters.add(database.getClusterNameById(rid.getClusterId()));
 
         final long now = System.currentTimeMillis();
@@ -1279,27 +1264,7 @@ public class ODatabaseImport extends ODatabaseImpExpAbstract {
 
     record = null;
     try {
-
-      try {
-        record = ORecordSerializerJSON.INSTANCE.fromString(value, record, null);
-      } catch (OSerializationException e) {
-        if (e.getCause() instanceof OSchemaException) {
-          // EXTRACT CLASS NAME If ANY
-          final int pos = value.indexOf("\"@class\":\"");
-          if (pos > -1) {
-            final int end = value.indexOf("\"", pos + "\"@class\":\"".length() + 1);
-            final String value1 = value.substring(0, pos + "\"@class\":\"".length());
-            final String clsName = value.substring(pos + "\"@class\":\"".length(), end);
-            final String value2 = value.substring(end);
-
-            final String newClassName = convertedClassNames.get(clsName);
-
-            value = value1 + newClassName + value2;
-            // OVERWRITE CLASS NAME WITH NEW NAME
-            record = ORecordSerializerJSON.INSTANCE.fromString(value, record, null);
-          }
-        }
-      }
+      record = ORecordSerializerJSON.INSTANCE.fromString(value, record, null);
 
       if (schemaImported && record.getIdentity().equals(schemaRecordId)) {
         // JUMP THE SCHEMA

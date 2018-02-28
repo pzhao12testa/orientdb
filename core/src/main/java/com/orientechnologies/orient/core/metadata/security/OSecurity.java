@@ -34,8 +34,7 @@ import java.util.Set;
  */
 public interface OSecurity {
   static final String RESTRICTED_CLASSNAME   = "ORestricted";
-  @Deprecated
-  static final String IDENTITY_CLASSNAME     = OIdentity.CLASS_NAME;
+  static final String IDENTITY_CLASSNAME     = "OIdentity";
   static final String ALLOW_ALL_FIELD        = "_allow";
   static final String ALLOW_READ_FIELD       = "_allowRead";
   static final String ALLOW_UPDATE_FIELD     = "_allowUpdate";

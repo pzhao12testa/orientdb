@@ -100,7 +100,8 @@ public class OSQLCommandTask extends OAbstractCommandTask {
       for (String c : clusters)
         clusterIds[i++] = database.getClusterIdByName(c);
 
-      final ORecordIteratorClusters<ORecord> filteredTarget = new ORecordIteratorClusters<ORecord>(database, database, clusterIds);
+      final ORecordIteratorClusters<ORecord> filteredTarget = new ORecordIteratorClusters<ORecord>(database, database, clusterIds,
+          true);
       if (target instanceof ORecordIteratorClusters)
         filteredTarget.setRange(((ORecordIteratorClusters) target).getBeginRange(),
             ((ORecordIteratorClusters) target).getEndRange());
@@ -132,7 +133,7 @@ public class OSQLCommandTask extends OAbstractCommandTask {
   }
 
   @Override
-  public long getDistributedTimeout() {
+  public long getTimeout() {
     return timeout;
   }
 

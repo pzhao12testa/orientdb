@@ -29,15 +29,15 @@ import com.orientechnologies.orient.core.record.ORecord;
  * 
  */
 public interface ORecordHook {
-  enum DISTRIBUTED_EXECUTION_MODE {
+  public enum DISTRIBUTED_EXECUTION_MODE {
     TARGET_NODE, SOURCE_NODE, BOTH
   }
 
-  enum HOOK_POSITION {
+  public enum HOOK_POSITION {
     FIRST, EARLY, REGULAR, LATE, LAST
   }
 
-  enum TYPE {
+  public enum TYPE {
     ANY, BEFORE_CREATE, BEFORE_READ, BEFORE_UPDATE, BEFORE_DELETE, AFTER_CREATE, AFTER_READ, AFTER_UPDATE, AFTER_DELETE,
 
     CREATE_FAILED, READ_FAILED, UPDATE_FAILED, DELETE_FAILED, CREATE_REPLICATED, READ_REPLICATED, UPDATE_REPLICATED,
@@ -45,13 +45,13 @@ public interface ORecordHook {
     DELETE_REPLICATED, FINALIZE_UPDATE, FINALIZE_CREATION
   }
 
-  enum RESULT {
+  public enum RESULT {
     RECORD_NOT_CHANGED, RECORD_CHANGED, SKIP, SKIP_IO, RECORD_REPLACED
   }
 
-  void onUnregister();
+  public void onUnregister();
 
-  RESULT onTrigger(TYPE iType, ORecord iRecord);
+  public RESULT onTrigger(TYPE iType, ORecord iRecord);
 
-  DISTRIBUTED_EXECUTION_MODE getDistributedExecutionMode();
+  public DISTRIBUTED_EXECUTION_MODE getDistributedExecutionMode();
 }

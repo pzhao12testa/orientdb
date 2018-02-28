@@ -16,53 +16,43 @@
  */
 package com.orientechnologies.orient.core.metadata;
 
+import java.io.IOException;
+
 import com.orientechnologies.orient.core.index.OIndexManagerProxy;
 import com.orientechnologies.orient.core.metadata.function.OFunctionLibrary;
 import com.orientechnologies.orient.core.metadata.schema.OSchema;
-import com.orientechnologies.orient.core.metadata.security.OIdentity;
-import com.orientechnologies.orient.core.metadata.security.ORole;
 import com.orientechnologies.orient.core.metadata.security.OSecurity;
-import com.orientechnologies.orient.core.metadata.security.OUser;
 import com.orientechnologies.orient.core.schedule.OSchedulerListener;
-
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
 
 /**
  * @author luca.molino
  * 
  */
 public interface OMetadata {
-  Set<String> SYSTEM_CLUSTER = new HashSet<String>(Arrays.asList(new String[] { OUser.CLASS_NAME.toLowerCase(),
-      ORole.CLASS_NAME.toLowerCase(), OIdentity.CLASS_NAME.toLowerCase(), "ORIDs".toLowerCase(),
-      OSecurity.RESTRICTED_CLASSNAME.toLowerCase(), "OFunction".toLowerCase(), "OTriggered".toLowerCase(),
-      "OSchedule".toLowerCase() }));
 
-  void load();
+  public void load();
 
-  void create() throws IOException;
+  public void create() throws IOException;
 
-  OSchema getSchema();
+  public OSchema getSchema();
 
-  OSecurity getSecurity();
+  public OSecurity getSecurity();
 
-  OIndexManagerProxy getIndexManager();
+  public OIndexManagerProxy getIndexManager();
 
-  int getSchemaClusterId();
+  public int getSchemaClusterId();
 
   /**
    * Reloads the internal objects.
    */
-  void reload();
+  public void reload();
 
   /**
    * Closes internal objects
    */
-  void close();
+  public void close();
 
-  OFunctionLibrary getFunctionLibrary();
+  public OFunctionLibrary getFunctionLibrary();
 
-  OSchedulerListener getSchedulerListener();
+  public OSchedulerListener getSchedulerListener();
 }

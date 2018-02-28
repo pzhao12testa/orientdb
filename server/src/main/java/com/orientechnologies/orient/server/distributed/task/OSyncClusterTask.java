@@ -23,6 +23,7 @@ import com.orientechnologies.common.io.OFileUtils;
 import com.orientechnologies.common.log.OLogManager;
 import com.orientechnologies.orient.core.Orient;
 import com.orientechnologies.orient.core.command.OCommandDistributedReplicateRequest;
+import com.orientechnologies.orient.core.command.OCommandOutputListener;
 import com.orientechnologies.orient.core.compression.impl.OZIPCompressionUtil;
 import com.orientechnologies.orient.core.config.OGlobalConfiguration;
 import com.orientechnologies.orient.core.db.document.ODatabaseDocumentTx;
@@ -49,17 +50,18 @@ import java.util.concurrent.locks.Lock;
  * @author Luca Garulli (l.garulli--at--orientechnologies.com)
  * 
  */
-public class OSyncClusterTask extends OAbstractReplicatedTask {
-  public final static int    CHUNK_MAX_SIZE = 4194304;         // 4MB
+public class OSyncClusterTask extends OAbstractReplicatedTask implements OCommandOutputListener {
+  public final static int    CHUNK_MAX_SIZE = 1048576;         // 1MB
   public static final String DEPLOYCLUSTER  = "deploycluster.";
+  protected long             random;
+
+  protected String           clusterName;
 
   public enum MODE {
     FULL_REPLACE, MERGE
   }
 
-  protected MODE   mode = MODE.FULL_REPLACE;
-  protected long   random;
-  protected String clusterName;
+  protected MODE mode = MODE.FULL_REPLACE;
 
   public OSyncClusterTask() {
   }
@@ -70,7 +72,7 @@ public class OSyncClusterTask extends OAbstractReplicatedTask {
   }
 
   @Override
-  public Object execute(final OServer iServer, final ODistributedServerManager iManager, final ODatabaseDocumentTx database)
+  public Object execute(final OServer iServer, ODistributedServerManager iManager, final ODatabaseDocumentTx database)
       throws Exception {
 
     if (!getNodeSource().equals(iManager.getLocalNodeName())) {
@@ -78,6 +80,11 @@ public class OSyncClusterTask extends OAbstractReplicatedTask {
         throw new ODistributedException("Database instance is null");
 
       final String databaseName = database.getName();
+
+      // final ODistributedConfiguration dCfg = iManager.getDatabaseConfiguration(databaseName);
+      // if (!clusterName.equalsIgnoreCase(dCfg.getMasterServer(clusterName)))
+      // // NOT MASTER SERVER FOR THIS CLUSTER, SKIP IT
+      // return Boolean.FALSE;
 
       final Lock lock = iManager.getLock("sync." + databaseName + "." + clusterName);
       if (lock.tryLock()) {
@@ -114,53 +121,27 @@ public class OSyncClusterTask extends OAbstractReplicatedTask {
 
           case FULL_REPLACE:
             final FileOutputStream fileOutputStream = new FileOutputStream(backupFile);
+            try {
+              database.freeze();
+              try {
 
-            final File completedFile = new File(backupFile.getAbsolutePath() + ".completed");
-            if (completedFile.exists())
-              completedFile.delete();
+                final String fileName = cluster.getFileName();
 
-            new Thread(new Runnable() {
-              @Override
-              public void run() {
-                Thread.currentThread().setName(
-                    "OrientDB SyncCluster node=" + iManager.getLocalNodeName() + " db=" + databaseName + " cluster=" + clusterName);
+                final String dbPath = iServer.getDatabaseDirectory() + databaseName;
 
-                try {
-                  database.activateOnCurrentThread();
-                  database.freeze();
-                  try {
+                final String[] fileNames = new String[] { fileName,
+                    fileName.substring(0, fileName.length() - 4) + OClusterPositionMap.DEF_EXTENSION };
 
-                    final String fileName = cluster.getFileName();
+                // COPY PCL AND CPM FILE
+                OZIPCompressionUtil.compressFiles(dbPath, fileNames, fileOutputStream, null,
+                    OGlobalConfiguration.DISTRIBUTED_DEPLOYDB_TASK_COMPRESSION.getValueAsInteger());
 
-                    final String dbPath = iServer.getDatabaseDirectory() + databaseName;
-
-                    final String[] fileNames = new String[] { fileName,
-                        fileName.substring(0, fileName.length() - 4) + OClusterPositionMap.DEF_EXTENSION };
-
-                    // COPY PCL AND CPM FILE
-                    OZIPCompressionUtil.compressFiles(dbPath, fileNames, fileOutputStream, null,
-                        OGlobalConfiguration.DISTRIBUTED_DEPLOYDB_TASK_COMPRESSION.getValueAsInteger());
-
-                  } catch (IOException e) {
-                    OLogManager.instance().error(this, "Cannot execute backup of cluster '%s.%s' for deploy cluster", e,
-                        databaseName, clusterName);
-                  } finally {
-                    database.release();
-                  }
-                } finally {
-                  try {
-                    fileOutputStream.close();
-                  } catch (IOException e) {
-                  }
-
-                  try {
-                    completedFile.createNewFile();
-                  } catch (IOException e) {
-                    OLogManager.instance().error(this, "Cannot create file of backup completed: %s", e, completedFile);
-                  }
-                }
+              } finally {
+                database.release();
               }
-            }).start();
+            } finally {
+              fileOutputStream.close();
+            }
 
             // TODO: SUPPORT BACKUP ON CLUSTER
             final long fileSize = backupFile.length();
@@ -207,7 +188,7 @@ public class OSyncClusterTask extends OAbstractReplicatedTask {
   }
 
   @Override
-  public long getDistributedTimeout() {
+  public long getTimeout() {
     return OGlobalConfiguration.DISTRIBUTED_DEPLOYDB_TASK_SYNCH_TIMEOUT.getValueAsLong();
   }
 
@@ -231,6 +212,16 @@ public class OSyncClusterTask extends OAbstractReplicatedTask {
   public void readExternal(final ObjectInput in) throws IOException, ClassNotFoundException {
     random = in.readLong();
     clusterName = in.readUTF();
+  }
+
+  @Override
+  public void onMessage(String iText) {
+    if (iText.startsWith("\r\n"))
+      iText = iText.substring(2);
+    if (iText.startsWith("\n"))
+      iText = iText.substring(1);
+
+    OLogManager.instance().info(this, iText);
   }
 
   @Override

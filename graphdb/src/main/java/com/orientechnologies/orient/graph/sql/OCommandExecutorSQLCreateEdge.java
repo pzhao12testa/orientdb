@@ -30,11 +30,22 @@ import com.orientechnologies.orient.core.exception.OCommandExecutionException;
 import com.orientechnologies.orient.core.exception.OConcurrentModificationException;
 import com.orientechnologies.orient.core.metadata.OMetadataInternal;
 import com.orientechnologies.orient.core.metadata.schema.OClass;
-import com.orientechnologies.orient.core.sql.*;
+import com.orientechnologies.orient.core.sql.OCommandExecutorSQLRetryAbstract;
+import com.orientechnologies.orient.core.sql.OCommandParameters;
+import com.orientechnologies.orient.core.sql.OCommandSQLParsingException;
+import com.orientechnologies.orient.core.sql.OSQLEngine;
+import com.orientechnologies.orient.core.sql.OSQLHelper;
 import com.orientechnologies.orient.core.sql.functions.OSQLFunctionRuntime;
-import com.tinkerpop.blueprints.impls.orient.*;
+import com.tinkerpop.blueprints.impls.orient.OrientBaseGraph;
+import com.tinkerpop.blueprints.impls.orient.OrientEdge;
+import com.tinkerpop.blueprints.impls.orient.OrientEdgeType;
+import com.tinkerpop.blueprints.impls.orient.OrientVertex;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * SQL CREATE EDGE command.
@@ -42,16 +53,13 @@ import java.util.*;
  * @author Luca Garulli
  */
 public class OCommandExecutorSQLCreateEdge extends OCommandExecutorSQLRetryAbstract implements OCommandDistributedReplicateRequest {
-  public static final String          NAME          = "CREATE EDGE";
-  private static final String         KEYWORD_BATCH = "BATCH";
+  public static final String          NAME = "CREATE EDGE";
 
   private String                      from;
   private String                      to;
   private OClass                      clazz;
-  private String                      edgeLabel;
   private String                      clusterName;
   private List<OPair<String, Object>> fields;
-  private int                         batch         = 100;
 
   @SuppressWarnings("unchecked")
   public OCommandExecutorSQLCreateEdge parse(final OCommandRequest iRequest) {
@@ -74,8 +82,7 @@ public class OCommandExecutorSQLCreateEdge extends OCommandExecutorSQLRetryAbstr
 
       String className = null;
 
-      String tempLower = parseOptionalWord(false);
-      String temp = tempLower == null ? null : tempLower.toUpperCase();
+      String temp = parseOptionalWord(true);
 
       while (temp != null) {
         if (temp.equals("CLUSTER")) {
@@ -97,19 +104,9 @@ public class OCommandExecutorSQLCreateEdge extends OCommandExecutorSQLRetryAbstr
         } else if (temp.equals(KEYWORD_RETRY)) {
           parseRetry();
 
-        } else if (temp.equals(KEYWORD_BATCH)) {
-          temp = parserNextWord(true);
-          if (temp != null)
-            batch = Integer.parseInt(temp);
-
         } else if (className == null && temp.length() > 0) {
-          className = tempLower;
-          OrientBaseGraph graph = OrientBaseGraph.getActiveGraph();
-          if (graph != null && graph.isUseClassForEdgeLabel()) {
-            clazz = ((OMetadataInternal) database.getMetadata()).getImmutableSchemaSnapshot().getClass(temp);
-          } else {
-            clazz = ((OMetadataInternal) database.getMetadata()).getImmutableSchemaSnapshot().getClass("E");
-          }
+          className = temp;
+          clazz = ((OMetadataInternal) database.getMetadata()).getImmutableSchemaSnapshot().getClass(className);
         }
 
         temp = parseOptionalWord(true);
@@ -127,7 +124,6 @@ public class OCommandExecutorSQLCreateEdge extends OCommandExecutorSQLRetryAbstr
       if (clazz == null)
         throw new OCommandSQLParsingException("Class '" + className + "' was not found");
 
-      edgeLabel = className;
     } finally {
       textRequest.setText(originalQuery);
     }
@@ -182,7 +178,7 @@ public class OCommandExecutorSQLCreateEdge extends OCommandExecutorSQLRetryAbstr
                     fields = OPair.convertFromMap(content.toMap());
                 }
 
-                edge = fromVertex.addEdge(null, toVertex, edgeLabel, clusterName, fields);
+                edge = fromVertex.addEdge(null, toVertex, clsName, clusterName, fields);
 
                 if (fields != null && !fields.isEmpty()) {
                   if (edge.isLightweight())
@@ -216,11 +212,6 @@ public class OCommandExecutorSQLCreateEdge extends OCommandExecutorSQLRetryAbstr
             }
 
             edges.add(edge);
-
-            if (batch > 0 && edges.size() % batch == 0) {
-              graph.commit();
-              ((OrientGraph) graph).begin();
-            }
           }
         }
 
@@ -259,6 +250,6 @@ public class OCommandExecutorSQLCreateEdge extends OCommandExecutorSQLRetryAbstr
 
   @Override
   public String getSyntax() {
-    return "CREATE EDGE [<class>] [CLUSTER <cluster>] FROM <rid>|(<query>|[<rid>]*) TO <rid>|(<query>|[<rid>]*) [SET <field> = <expression>[,]*]|CONTENT {<JSON>} [RETRY <retry> [WAIT <pauseBetweenRetriesInMs]] [BATCH <batch-size>]";
+    return "CREATE EDGE [<class>] [CLUSTER <cluster>] FROM <rid>|(<query>|[<rid>]*) TO <rid>|(<query>|[<rid>]*) [SET <field> = <expression>[,]*]|CONTENT {<JSON>} [RETRY <retry> [WAIT <pauseBetweenRetriesInMs]]";
   }
 }

@@ -707,7 +707,7 @@ public class OPropertyImpl extends ODocumentWrapperNoClass implements OProperty 
         final OCommandSQL commandSQL = new OCommandSQL(cmd);
         commandSQL.addExcludedNode(((OAutoshardedStorage) storage).getNodeId());
 
-        database.command(commandSQL).execute();
+        database.command(new OCommandSQL(cmd)).execute();
 
         setRegexpInternal(regexp);
       } else

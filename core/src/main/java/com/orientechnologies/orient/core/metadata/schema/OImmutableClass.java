@@ -657,7 +657,7 @@ public class OImmutableClass implements OClass {
   }
 
   @Override
-  public String getCustom(final String iName) {
+  public String getCustom(String iName) {
     return customFields.get(iName);
   }
 
@@ -682,17 +682,12 @@ public class OImmutableClass implements OClass {
   }
 
   @Override
-  public boolean hasClusterId(final int clusterId) {
+  public boolean hasClusterId(int clusterId) {
     return Arrays.binarySearch(clusterIds, clusterId) >= 0;
   }
 
   @Override
-  public boolean hasPolymorphicClusterId(final int clusterId) {
-    return Arrays.binarySearch(polymorphicClusterIds, clusterId) >= 0;
-  }
-
-  @Override
-  public int compareTo(final OClass other) {
+  public int compareTo(OClass other) {
     return name.compareTo(other.getName());
   }
 

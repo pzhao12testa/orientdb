@@ -26,7 +26,6 @@ import com.orientechnologies.orient.core.command.OCommandContext;
 import com.orientechnologies.orient.core.db.record.OIdentifiable;
 import com.orientechnologies.orient.core.exception.OCommandExecutionException;
 import com.orientechnologies.orient.core.record.impl.ODocument;
-import com.orientechnologies.orient.core.serialization.serializer.OStringSerializerHelper;
 import com.orientechnologies.orient.core.sql.method.misc.OSQLMethodField;
 import com.orientechnologies.orient.core.sql.methods.OSQLMethodRuntime;
 
@@ -82,7 +81,7 @@ public class OSQLFilterItemField extends OSQLFilterItemAbstract {
   }
 
   public OSQLFilterItemField(final String iName) {
-    this.name = OStringSerializerHelper.getStringContent(iName);
+    this.name = iName;
   }
 
   public OSQLFilterItemField(final OBaseParser iQueryToParse, final String iName) {
@@ -117,7 +116,7 @@ public class OSQLFilterItemField extends OSQLFilterItemAbstract {
   }
 
   public void setRoot(final OBaseParser iQueryToParse, final String iRoot) {
-    this.name = OStringSerializerHelper.getStringContent(iRoot);
+    this.name = iRoot;
   }
 
   /**

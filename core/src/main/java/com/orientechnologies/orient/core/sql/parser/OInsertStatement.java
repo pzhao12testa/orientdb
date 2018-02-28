@@ -10,12 +10,9 @@ public class OInsertStatement extends OStatement {
   OIdentifier      targetClusterName;
   OCluster         targetCluster;
   OIndexIdentifier targetIndex;
-  OInsertBody      insertBody;
   OProjection      returnStatement;
-  OSelectStatement selectStatement;
-  boolean          selectInParentheses = false;
-  boolean          selectWithFrom      = false;
-  boolean          unsafe              = false;
+  OInsertBody      insertBody;
+  boolean          unsafe = false;
 
   public OInsertStatement(int id) {
     super(id);
@@ -42,27 +39,13 @@ public class OInsertStatement extends OStatement {
     if (targetIndex != null) {
       result.append(targetIndex.toString());
     }
-    if (insertBody != null) {
-      result.append(" ");
-      result.append(insertBody.toString());
-    }
     if (returnStatement != null) {
       result.append(" RETURN ");
       result.append(returnStatement.toString());
     }
-    if (selectStatement != null) {
+    if (insertBody != null) {
       result.append(" ");
-      if (selectWithFrom) {
-        result.append("FROM ");
-      }
-      if (selectInParentheses) {
-        result.append("(");
-      }
-      result.append(selectStatement.toString());
-      if (selectInParentheses) {
-        result.append(")");
-      }
-
+      result.append(insertBody.toString());
     }
     if (unsafe) {
       result.append(" UNSAFE");
@@ -71,14 +54,11 @@ public class OInsertStatement extends OStatement {
   }
 
   public void replaceParameters(Map<Object, Object> params) {
-    if (insertBody != null) {
-      insertBody.replaceParameters(params);
-    }
     if (returnStatement != null) {
       returnStatement.replaceParameters(params);
     }
-    if (selectStatement != null) {
-      selectStatement.replaceParameters(params);
+    if (insertBody != null) {
+      insertBody.replaceParameters(params);
     }
   }
 

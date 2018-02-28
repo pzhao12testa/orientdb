@@ -54,16 +54,16 @@ public abstract class OAbstractRemoteTask implements Externalizable {
   public abstract Object execute(OServer iServer, ODistributedServerManager iManager, ODatabaseDocumentTx database)
       throws Exception;
 
-  public long getDistributedTimeout() {
+  public long getTimeout() {
     return OGlobalConfiguration.DISTRIBUTED_CRUD_TASK_SYNCH_TIMEOUT.getValueAsLong();
   }
 
   public long getSynchronousTimeout(final int iSynchNodes) {
-    return getDistributedTimeout() * iSynchNodes;
+    return getTimeout() * iSynchNodes;
   }
 
   public long getTotalTimeout(final int iTotalNodes) {
-    return getDistributedTimeout() * iTotalNodes;
+    return getTimeout() * iTotalNodes;
   }
 
   public RESULT_STRATEGY getResultStrategy() {

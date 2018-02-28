@@ -196,6 +196,16 @@ public class OOfflineCluster implements OCluster {
   }
 
   @Override
+  public void setSoftlyClosed(boolean softlyClosed) throws IOException {
+
+  }
+
+  @Override
+  public boolean wasSoftlyClosed() throws IOException {
+    return false;
+  }
+
+  @Override
   public String getName() {
     return name;
   }
@@ -227,11 +237,6 @@ public class OOfflineCluster implements OCluster {
 
   @Override
   public boolean isHashBased() {
-    return false;
-  }
-
-  @Override
-  public boolean isSystemCluster() {
     return false;
   }
 

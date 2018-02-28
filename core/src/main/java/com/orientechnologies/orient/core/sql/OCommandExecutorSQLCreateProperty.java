@@ -30,8 +30,6 @@ import com.orientechnologies.orient.core.metadata.schema.OClassImpl;
 import com.orientechnologies.orient.core.metadata.schema.OPropertyImpl;
 import com.orientechnologies.orient.core.metadata.schema.OType;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
@@ -72,7 +70,7 @@ public class OCommandExecutorSQLCreateProperty extends OCommandExecutorSQLAbstra
     if (pos == -1)
       throw new OCommandSQLParsingException("Expected <class>.<property>", parserText, oldPos);
 
-    String[] parts = split(word);
+    String[] parts = word.toString().split("\\.");
     if (parts.length != 2)
       throw new OCommandSQLParsingException("Expected <class>.<property>", parserText, oldPos);
 
@@ -108,40 +106,6 @@ public class OCommandExecutorSQLCreateProperty extends OCommandExecutorSQLAbstra
     }
 
     return this;
-  }
-
-
-  private String[] split(StringBuilder word) {
-    List<String> result = new ArrayList<String>();
-    StringBuilder builder = new StringBuilder();
-    boolean quoted = false;
-    for (char c : word.toString().toCharArray()) {
-      if (!quoted) {
-        if (c == '`') {
-          quoted = true;
-        } else if (c == '.') {
-          String nextToken = builder.toString().trim();
-          if (nextToken.length() > 0) {
-            result.add(nextToken);
-          }
-          builder = new StringBuilder();
-        } else {
-          builder.append(c);
-        }
-      } else {
-        if (c == '`') {
-          quoted = false;
-        } else {
-          builder.append(c);
-        }
-      }
-    }
-    String nextToken = builder.toString().trim();
-    if (nextToken.length() > 0) {
-      result.add(nextToken);
-    }
-    return result.toArray(new String[] {});
-    // return word.toString().split("\\.");
   }
 
   @Override
