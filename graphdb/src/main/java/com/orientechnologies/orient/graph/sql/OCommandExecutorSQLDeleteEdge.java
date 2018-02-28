@@ -19,6 +19,13 @@
  */
 package com.orientechnologies.orient.graph.sql;
 
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
 import com.orientechnologies.common.concur.ONeedRetryException;
 import com.orientechnologies.common.types.OModifiableBoolean;
 import com.orientechnologies.orient.core.command.OCommandDistributedReplicateRequest;
@@ -41,9 +48,11 @@ import com.orientechnologies.orient.core.sql.filter.OSQLFilter;
 import com.orientechnologies.orient.core.sql.query.OSQLAsynchQuery;
 import com.tinkerpop.blueprints.Direction;
 import com.tinkerpop.blueprints.Edge;
-import com.tinkerpop.blueprints.impls.orient.*;
-
-import java.util.*;
+import com.tinkerpop.blueprints.impls.orient.OrientBaseGraph;
+import com.tinkerpop.blueprints.impls.orient.OrientEdge;
+import com.tinkerpop.blueprints.impls.orient.OrientEdgeType;
+import com.tinkerpop.blueprints.impls.orient.OrientGraph;
+import com.tinkerpop.blueprints.impls.orient.OrientVertex;
 
 /**
  * SQL DELETE EDGE command.
@@ -142,11 +151,6 @@ public class OCommandExecutorSQLDeleteEdge extends OCommandExecutorSQLRetryAbstr
             if (temp != null)
               batch = Integer.parseInt(temp);
 
-          } else if (temp.equals(KEYWORD_LIMIT)) {
-            temp = parserNextWord(true);
-            if (temp != null)
-              limit = Integer.parseInt(temp);
-
           } else if (temp.length() > 0) {
             // GET/CHECK CLASS NAME
             label = originalTemp;
@@ -161,11 +165,7 @@ public class OCommandExecutorSQLDeleteEdge extends OCommandExecutorSQLRetryAbstr
         }
 
         if (where == null)
-          if (limit > -1) {
-            where = " LIMIT " + limit;
-          } else {
-            where = "";
-          }
+          where = "";
         else
           where = " WHERE " + where;
 

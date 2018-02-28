@@ -252,8 +252,7 @@ public abstract class OrientBaseGraph extends OrientConfigurableGraph implements
    *          of graph
    */
   public OrientBaseGraph(final Configuration configuration) {
-    this(configuration.getString("blueprints.orientdb.url", null), configuration.getString("blueprints.orientdb.username", null),
-        configuration.getString("blueprints.orientdb.password", null));
+    this(configuration.getString("blueprints.orientdb.url", null), configuration.getString("blueprints.orientdb.username", null), configuration.getString("blueprints.orientdb.password", null));
     super.init(configuration);
   }
 
@@ -829,14 +828,13 @@ public abstract class OrientBaseGraph extends OrientConfigurableGraph implements
     String indexName;
     final String key;
     int pos = iKey.indexOf('.');
-    OClass clazz = null;
     if (pos > -1) {
       indexName = iKey;
 
       final String className = iKey.substring(0, pos);
       key = iKey.substring(iKey.indexOf('.') + 1);
 
-      clazz = database.getMetadata().getImmutableSchemaSnapshot().getClass(className);
+      final OClass clazz = database.getMetadata().getImmutableSchemaSnapshot().getClass(className);
 
       final Collection<? extends OIndex<?>> indexes = clazz.getIndexes();
       for (OIndex<?> index : indexes) {
@@ -866,10 +864,7 @@ public abstract class OrientBaseGraph extends OrientConfigurableGraph implements
     }
 
     // NO INDEX: EXECUTE A QUERY
-    OrientGraphQuery query = (OrientGraphQuery) query();
-    if (clazz != null)
-      query.labels(clazz.getName());
-    return query.has(key, iValue).vertices();
+    return query().has(key, iValue).vertices();
   }
 
   /**

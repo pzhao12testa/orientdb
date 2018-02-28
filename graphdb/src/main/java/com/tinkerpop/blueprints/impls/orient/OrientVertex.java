@@ -613,13 +613,13 @@ public class OrientVertex extends OrientElement implements OrientExtendedVertex 
           } else {
             // CREATE LAZY Iterable AGAINST COLLECTION FIELD
             if (coll instanceof ORecordLazyMultiValue)
-              iterable.add(new OrientVertexIterator(this, coll, ((ORecordLazyMultiValue) coll).rawIterator(), connection, iLabels,
+              iterable.add(new OrientVertexIterator(this, ((ORecordLazyMultiValue) coll).rawIterator(), connection, iLabels,
                   coll.size()));
             else
-              iterable.add(new OrientVertexIterator(this, coll, coll.iterator(), connection, iLabels, -1));
+              iterable.add(new OrientVertexIterator(this, coll.iterator(), connection, iLabels, -1));
           }
         } else if (fieldValue instanceof ORidBag) {
-          iterable.add(new OrientVertexIterator(this, fieldValue, ((ORidBag) fieldValue).rawIterator(), connection, iLabels, -1));
+          iterable.add(new OrientVertexIterator(this, ((ORidBag) fieldValue).rawIterator(), connection, iLabels, -1));
         }
     }
 
@@ -781,11 +781,11 @@ public class OrientVertex extends OrientElement implements OrientExtendedVertex 
         final String inFieldName = OrientVertex.getConnectionFieldName(Direction.IN, oe.getLabel(),
             graph.isUseVertexFieldsForEdgeLabels());
 
-        replaceLinks(inV.getRecord(), inFieldName, oldIdentity, doc);
+        replaceLinks(inV.getRecord(), inFieldName, oldIdentity, newIdentity);
       } else {
         // REPLACE WITH NEW VERTEX
-        oe.vOut = doc;
-        oe.getRecord().field(OrientBaseGraph.CONNECTION_OUT, doc);
+        oe.vOut = newIdentity;
+        oe.getRecord().field(OrientBaseGraph.CONNECTION_OUT, newIdentity);
         oe.save();
       }
     }
@@ -799,11 +799,11 @@ public class OrientVertex extends OrientElement implements OrientExtendedVertex 
         final String outFieldName = OrientVertex.getConnectionFieldName(Direction.OUT, oe.getLabel(),
             graph.isUseVertexFieldsForEdgeLabels());
 
-        replaceLinks(outV.getRecord(), outFieldName, oldIdentity, doc);
+        replaceLinks(outV.getRecord(), outFieldName, oldIdentity, newIdentity);
       } else {
         // REPLACE WITH NEW VERTEX
-        oe.vIn = doc;
-        oe.getRecord().field(OrientBaseGraph.CONNECTION_IN, doc);
+        oe.vIn = newIdentity;
+        oe.getRecord().field(OrientBaseGraph.CONNECTION_IN, newIdentity);
         oe.save();
       }
     }
@@ -1046,7 +1046,7 @@ public class OrientVertex extends OrientElement implements OrientExtendedVertex 
   }
 
   /**
-   * (Blueprints Extension) Returns all the edges from the current Vertex to another one.
+   * (Blueprints Entension) Returns all the edges from the current Vertex to another one.
    *
    * @param iDestination
    *          The target vertex
@@ -1094,14 +1094,14 @@ public class OrientVertex extends OrientElement implements OrientExtendedVertex 
           } else {
             // CREATE LAZY Iterable AGAINST COLLECTION FIELD
             if (coll instanceof ORecordLazyMultiValue) {
-              iterable.add(new OrientEdgeIterator(this, iDestination, coll, ((ORecordLazyMultiValue) coll).rawIterator(),
-                  connection, iLabels, coll.size()));
+              iterable.add(new OrientEdgeIterator(this, iDestination, ((ORecordLazyMultiValue) coll).rawIterator(), connection,
+                  iLabels, coll.size()));
             } else
-              iterable.add(new OrientEdgeIterator(this, iDestination, coll, coll.iterator(), connection, iLabels, -1));
+              iterable.add(new OrientEdgeIterator(this, iDestination, coll.iterator(), connection, iLabels, -1));
           }
         } else if (fieldValue instanceof ORidBag) {
-          iterable.add(new OrientEdgeIterator(this, iDestination, fieldValue, ((ORidBag) fieldValue).rawIterator(), connection,
-              iLabels, ((ORidBag) fieldValue).size()));
+          iterable.add(new OrientEdgeIterator(this, iDestination, ((ORidBag) fieldValue).rawIterator(), connection, iLabels,
+              ((ORidBag) fieldValue).size()));
         }
       }
     }

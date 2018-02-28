@@ -19,12 +19,6 @@
  */
 package com.orientechnologies.orient.core.sql;
 
-import java.util.*;
-import java.util.Map.Entry;
-import java.util.concurrent.Future;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
-
 import com.orientechnologies.common.collection.OMultiCollectionIterator;
 import com.orientechnologies.common.collection.OMultiValue;
 import com.orientechnologies.common.collection.OSortedMultiIterator;
@@ -84,6 +78,12 @@ import com.orientechnologies.orient.core.sql.parser.OOrderByItem;
 import com.orientechnologies.orient.core.sql.query.OResultSet;
 import com.orientechnologies.orient.core.sql.query.OSQLQuery;
 import com.orientechnologies.orient.core.storage.OStorage.LOCKING_STRATEGY;
+
+import java.util.*;
+import java.util.Map.Entry;
+import java.util.concurrent.Future;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Executes the SQL SELECT statement. the parse() method compiles the query and builds the meta information needed by the execute().
@@ -190,15 +190,8 @@ public class OCommandExecutorSQLSelect extends OCommandExecutorSQLResultsetAbstr
         }
       }
     } else {
-      if (indexDefinition instanceof OIndexDefinitionMultiValue)
-        return ((OIndexDefinitionMultiValue) indexDefinition).createSingleValue(OSQLHelper.getValue(value));
-      else
-        return indexDefinition.createValue(OSQLHelper.getValue(value));
+      return indexDefinition.createValue(OSQLHelper.getValue(value));
     }
-  }
-
-  public boolean hasGroupBy() {
-    return groupByFields != null && groupByFields.size() > 0;
   }
 
   @Override
@@ -2128,7 +2121,7 @@ public class OCommandExecutorSQLSelect extends OCommandExecutorSQLResultsetAbstr
           if (r != null) {
             if (r instanceof OIdentifiable) {
               ((Collection<OIdentifiable>) tempResult).add((OIdentifiable) r);
-            } else if (r instanceof Iterator || OMultiValue.isMultiValue(r)) {
+            } else if (OMultiValue.isMultiValue(r)) {
               for (Object o : OMultiValue.getMultiValueIterable(r)) {
                 ((Collection<OIdentifiable>) tempResult).add((OIdentifiable) o);
               }
@@ -2137,18 +2130,7 @@ public class OCommandExecutorSQLSelect extends OCommandExecutorSQLResultsetAbstr
         }
       } else {
         final OMultiCollectionIterator<OIdentifiable> finalResult = new OMultiCollectionIterator<OIdentifiable>();
-        int iteratorLimit = 0;
-        if (limit < 0) {
-          iteratorLimit = -1;
-        } else {
-          iteratorLimit += limit;
-          if (skip > 0) {
-            iteratorLimit += skip;
-          }
-        }
-
-        finalResult.setLimit(iteratorLimit);
-
+        finalResult.setLimit(limit);
         for (OIdentifiable id : tempResult) {
           final Object fieldValue;
           if (expandTarget instanceof OSQLFilterItem) {
